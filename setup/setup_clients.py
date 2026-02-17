@@ -147,7 +147,14 @@ def print_mcp_config(client_name: str, client_id: str, mcp_server_url: str):
     config = {
         "mcpServers": {
             "fusionauth-mcp": {
-                "url": f"{mcp_server_url}/mcp",
+                "command": "npx",
+                "args": [
+                    "mcp-remote",
+                    f"{mcp_server_url}/mcp",
+                    "--allow-http",
+                    "--static-oauth-client-info",
+                    f'{{"client_id":"{client_id}"}}'
+                ]
             }
         }
     }
