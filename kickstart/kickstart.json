@@ -1,0 +1,75 @@
+{
+  "variables": {
+    "apiKey": "bf69486b-4733-4470-a592-f1bfce7af580",
+    "mcpAppId": "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e",
+    "testUserId": "00000000-0000-0000-0000-000000000001",
+    "testUserPassword": "password"
+  },
+  "apiKeys": [
+    {
+      "key": "#{apiKey}",
+      "description": "MCP Server API Key"
+    }
+  ],
+  "licenseId": "FUSIONAUTH_LICENSE_ID_PLACEHOLDER",
+  "requests": [
+    {
+      "method": "POST",
+      "url": "/api/application/#{mcpAppId}",
+      "body": {
+        "application": {
+          "name": "MCP Server",
+          "oauthConfiguration": {
+            "authorizedRedirectURLs": [
+              "http://localhost:3000/callback",
+              "http://127.0.0.1:3000/callback",
+              "http://localhost/callback"
+            ],
+            "clientAuthenticationPolicy": "NotRequiredWhenUsingPKCE",
+            "enabledGrants": [
+              "authorization_code",
+              "refresh_token"
+            ],
+            "generateRefreshTokens": true,
+            "proofKeyForCodeExchangePolicy": "Required",
+            "requireClientAuthentication": false
+          },
+          "loginConfiguration": {
+            "allowTokenRefresh": true,
+            "generateRefreshTokens": true,
+            "requireAuthentication": true
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user/registration/#{testUserId}",
+      "body": {
+        "user": {
+          "email": "test@example.com",
+          "firstName": "Test",
+          "lastName": "User",
+          "password": "#{testUserPassword}",
+          "username": "testuser"
+        },
+        "registration": {
+          "applicationId": "#{mcpAppId}"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/application/#{mcpAppId}/scope",
+      "body": {
+        "scope": {
+          "name": "get_name",
+          "description": "Access the get_name tool to retrieve the authenticated user's name",
+          "defaultConsentMessage": "Allow this application to read your name",
+          "defaultConsentDetail": "This will share your display name with the requesting application.",
+          "required": true
+        }
+      }
+    }
+  ]
+}

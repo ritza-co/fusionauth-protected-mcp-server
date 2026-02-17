@@ -1,0 +1,102 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fusionauth
+      POSTGRES_USER: fusionauth
+      POSTGRES_PASSWORD: fusionauth
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fusionauth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - fusionauth
+
+  search:
+    image: opensearchproject/opensearch:2.11.0
+    environment:
+      - cluster.name=fusionauth
+      - node.name=search
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - search_data:/usr/share/opensearch/data
+    networks:
+      - fusionauth
+
+  fusionauth:
+    image: fusionauth/fusionauth-app:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/fusionauth
+      DATABASE_ROOT_USERNAME: fusionauth
+      DATABASE_ROOT_PASSWORD: fusionauth
+      DATABASE_USERNAME: fusionauth
+      DATABASE_PASSWORD: fusionauth
+      FUSIONAUTH_APP_MEMORY: 512M
+      FUSIONAUTH_APP_RUNTIME_MODE: development
+      FUSIONAUTH_APP_URL: http://fusionauth:9011
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      SEARCH_SERVERS: http://search:9200
+      SEARCH_TYPE: elasticsearch
+      FUSIONAUTH_APP_KICKSTART_FILE: /usr/local/fusionauth/kickstart/kickstart.json
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9011/api/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    ports:
+      - "9011:9011"
+    volumes:
+      - fusionauth_config:/usr/local/fusionauth/config
+      - ./kickstart:/usr/local/fusionauth/kickstart
+    networks:
+      - fusionauth
+
+  mcp-server:
+    build:
+      context: ./mcp-server
+    depends_on:
+      fusionauth:
+        condition: service_healthy
+    environment:
+      FUSIONAUTH_URL: http://fusionauth:9011
+      FUSIONAUTH_EXTERNAL_URL: http://localhost:9011
+      MCP_SERVER_URL: http://localhost:8000
+      MCP_APP_ID: e9fdb985-9173-4e01-9d73-ac2d60d1dc8e
+      FUSIONAUTH_API_KEY: bf69486b-4733-4470-a592-f1bfce7af580
+    ports:
+      - "8000:8000"
+    networks:
+      - fusionauth
+
+volumes:
+  db_data:
+  search_data:
+  fusionauth_config:
+
+networks:
+  fusionauth:
+    driver: bridge
