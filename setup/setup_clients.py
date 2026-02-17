@@ -31,6 +31,8 @@ CLIENT_CONFIGS = {
             "http://127.0.0.1:3334/oauth/callback",
             "http://localhost:3000/callback",
             "http://127.0.0.1:3000/callback",
+            "http://localhost:16442/oauth/callback",
+            "http://127.0.0.1:16442/oauth/callback",
             "http://localhost/callback",
         ],
     },
