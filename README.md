@@ -1,97 +1,92 @@
 # FusionAuth MCP Server Tutorial
 
-A step-by-step tutorial for protecting an MCP (Model Context Protocol) server with FusionAuth OAuth.
+A complete example of protecting an MCP (Model Context Protocol) server with FusionAuth OAuth.
 
-## Tutorial Structure
+## What This Demo Shows
 
-This repository supports a hands-on tutorial where you'll add OAuth protection to an MCP server:
-
-- **Start here (main branch)**: Unprotected MCP server with a simple `get_name` tool
-- **Follow the tutorial**: Add OAuth protection step-by-step
-- **Reference (completed-app branch)**: Complete working implementation
-
-The tutorial walks you through adding:
-- FusionAuth OAuth configuration
+- MCP server with a single `get_name` tool protected by OAuth
+- FusionAuth as the OAuth authorization server
+- Custom OAuth scope (`get_name`) with user consent
 - Token validation via UserInfo endpoint
-- Custom scopes and consent flow
-- OAuth discovery metadata
-- Client registration
-
-To see the completed implementation:
-```bash
-git checkout completed-app
-```
+- Complete Docker Compose setup with kickstart configuration
+- Claude Desktop integration via mcp-remote
 
 ## Prerequisites
 
-- Node.js >= 20.18.1
-- Docker Desktop
-- Claude Desktop
-- Python 3.12+
+- **Node.js >= 20.18.1**
+- **Docker Desktop**
+- **Claude Desktop**
+- **Python 3.12+**
 - **FusionAuth Enterprise license** - Custom OAuth scopes require an Enterprise license. [Contact FusionAuth](https://fusionauth.io/pricing) to obtain a license key.
 
-## Quick Start (Starter Code)
-
-This starter code gives you a working MCP server without authentication. You'll add OAuth protection as you follow the tutorial.
+## Quick Start
 
 ### 1. Configure your license
 
 Open `kickstart/kickstart.json` and replace `YOUR_LICENSE_KEY_HERE` with your FusionAuth Enterprise license key.
 
-### 2. Start the Docker stack
+### 2. Start the stack
 
 ```bash
 docker compose up -d
 ```
 
-Wait about 30 seconds for all services to start. This includes:
-- FusionAuth (port 9011) - pre-configured via kickstart
-- MCP Server (port 8000) - unprotected starter version
-- PostgreSQL - FusionAuth database
-- OpenSearch - FusionAuth search engine
+Wait about 30 seconds for all services to be healthy.
 
-### 3. Test the unprotected server
-
-The MCP server is running but has no authentication. You can test it directly:
+### 3. Register Claude Desktop as a client
 
 ```bash
-curl -X POST http://localhost:8000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/call",
-    "params": {
-      "name": "get_name",
-      "arguments": {}
-    }
-  }'
+cd setup
+pip install -r requirements.txt
+python setup_clients.py
 ```
 
-You should see:
+Copy the client ID that's printed.
+
+### 4. Configure Claude Desktop
+
+Open Claude Desktop and go to **Settings → Developer → Edit Config**.
+
+Add this configuration (replace `YOUR_CLIENT_ID_HERE` with the client ID from step 3):
+
 ```json
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "Hello, World!"
-      }
-    ]
+  "mcpServers": {
+    "fusionauth-mcp": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:8000/mcp",
+        "--allow-http",
+        "--static-oauth-client-info",
+        "{\"client_id\":\"YOUR_CLIENT_ID_HERE\"}"
+      ]
+    }
   }
 }
 ```
 
-### 4. Follow the tutorial
+### 5. Test the connection
 
-Now you're ready to add OAuth protection! Follow the tutorial to:
-- Add token validation
-- Configure OAuth discovery
-- Register Claude Desktop as a client
-- Test the protected server
+Restart Claude Desktop. Your browser will open to FusionAuth's login page.
+
+Login credentials:
+- Email: `test@example.com`
+- Password: `password`
+
+After granting consent, ask Claude: "What's my name?"
+
+## Branches
+
+- **main** - Starter code (unprotected MCP server) - follow the tutorial to add OAuth
+- **completed-app** - Complete implementation with OAuth protection
+
+## Architecture
+
+- **FusionAuth** (port 9011) - OAuth authorization server
+- **MCP Server** (port 8000) - Protected MCP server with `get_name` tool
+- **PostgreSQL** - FusionAuth database
+- **OpenSearch** - FusionAuth search engine
 
 ## Learn More
 
