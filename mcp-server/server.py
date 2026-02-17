@@ -77,7 +77,7 @@ token_verifier = FusionAuthTokenVerifier(
 
 auth = RemoteAuthProvider(
     token_verifier=token_verifier,
-    authorization_servers=[AnyHttpUrl(MCP_SERVER_URL)],
+    authorization_servers=[AnyHttpUrl(FUSIONAUTH_EXTERNAL_URL)],
     base_url=MCP_SERVER_URL,
 )
 
@@ -125,51 +125,7 @@ def get_name() -> str:
 
 
 if __name__ == "__main__":
-    from starlette.applications import Starlette
-    from starlette.responses import JSONResponse
-    from starlette.routing import Route
-
-    def _build_auth_server_metadata():
-        """Fetch FusionAuth OIDC discovery and add PKCE support."""
-        try:
-            resp = requests.get(
-                f"{FUSIONAUTH_URL}/.well-known/openid-configuration",
-                timeout=5,
-            )
-            metadata = resp.json()
-        except Exception:
-            metadata = {}
-
-        # Add PKCE support (FusionAuth doesn't advertise this)
-        metadata["code_challenge_methods_supported"] = ["S256"]
-
-        # Rewrite internal Docker hostname to localhost
-        metadata_str = json.dumps(metadata)
-        metadata_str = metadata_str.replace(
-            "http://fusionauth:9011",
-            "http://localhost:9011"
-        )
-        metadata = json.loads(metadata_str)
-
-        return metadata
-
-    async def auth_server_metadata(request):
-        metadata = _build_auth_server_metadata()
-        return JSONResponse(metadata)
+    import uvicorn
 
     mcp_app = mcp.http_app()
-
-    app = Starlette(
-        routes=[
-            Route(
-                "/.well-known/oauth-authorization-server",
-                auth_server_metadata,
-                methods=["GET"],
-            ),
-        ],
-        lifespan=mcp_app.lifespan,
-    )
-    app.mount("/", mcp_app)
-
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(mcp_app, host="0.0.0.0", port=8000)
