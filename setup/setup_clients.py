@@ -85,13 +85,17 @@ def create_scope(base_url: str, api_key: str, app_id: str) -> bool:
         return True
     elif resp.status_code == 400:
         error_data = resp.json()
+        field_errors = error_data.get("fieldErrors", {})
         general_errors = error_data.get("generalErrors", [])
+        if "scope.name" in field_errors:
+            # Scope already exists, treat as success
+            return True
         for err in general_errors:
             if "license" in err.get("message", "").lower():
-                print("  Note: Custom scopes require a FusionAuth license (Advanced plan).")
+                print("  Note: Custom scopes require a FusionAuth Enterprise license.")
                 print("  The MCP server will still work, but without the custom 'get_name' scope.")
                 return False
-        print(f"  Failed to create scope: {resp.text}")
+        print(f"  Failed to create scope: {resp.status_code}")
         return False
     else:
         print(f"  Failed to create scope: {resp.status_code}")
@@ -140,7 +144,6 @@ def create_client_application(
         }
     else:
         print(f"  Failed to create {config['name']}: {resp.status_code}")
-        print(f"  Response: {resp.text}")
         return None
 
 
