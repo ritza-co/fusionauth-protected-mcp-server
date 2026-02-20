@@ -16,6 +16,15 @@
   "licenseId": "YOUR_LICENSE_KEY_HERE",
   "requests": [
     {
+      "method": "PATCH",
+      "url": "/api/tenant/#{FUSIONAUTH_TENANT_ID}",
+      "body": {
+        "tenant": {
+          "issuer": "http://localhost:9011"
+        }
+      }
+    },
+    {
       "method": "POST",
       "url": "/api/application/#{mcpAppId}",
       "body": {
