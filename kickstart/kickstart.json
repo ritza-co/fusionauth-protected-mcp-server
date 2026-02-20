@@ -11,7 +11,7 @@
       "description": "MCP Server API Key"
     }
   ],
-  "licenseId": "FUSIONAUTH_LICENSE_ID_PLACEHOLDER",
+  "licenseId": "YOUR_LICENSE_KEY_HERE",
   "requests": [
     {
       "method": "POST",
