@@ -15,38 +15,10 @@ services:
     networks:
       - fusionauth
 
-  search:
-    image: opensearchproject/opensearch:2.11.0
-    environment:
-      - cluster.name=fusionauth
-      - node.name=search
-      - discovery.type=single-node
-      - plugins.security.disabled=true
-      - bootstrap.memory_lock=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - search_data:/usr/share/opensearch/data
-    networks:
-      - fusionauth
-
   fusionauth:
     image: fusionauth/fusionauth-app:latest
     depends_on:
       db:
-        condition: service_healthy
-      search:
         condition: service_healthy
     environment:
       DATABASE_URL: jdbc:postgresql://db:5432/fusionauth
@@ -57,9 +29,7 @@ services:
       FUSIONAUTH_APP_MEMORY: 512M
       FUSIONAUTH_APP_RUNTIME_MODE: development
       FUSIONAUTH_APP_URL: http://fusionauth:9011
-      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
-      SEARCH_SERVERS: http://search:9200
-      SEARCH_TYPE: elasticsearch
+      SEARCH_TYPE: database
       FUSIONAUTH_APP_KICKSTART_FILE: /usr/local/fusionauth/kickstart/kickstart.json
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9011/api/status"]
@@ -94,7 +64,6 @@ services:
 
 volumes:
   db_data:
-  search_data:
   fusionauth_config:
 
 networks:
