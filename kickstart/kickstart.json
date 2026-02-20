@@ -3,7 +3,9 @@
     "apiKey": "bf69486b-4733-4470-a592-f1bfce7af580",
     "mcpAppId": "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e",
     "testUserId": "00000000-0000-0000-0000-000000000001",
-    "testUserPassword": "password"
+    "testUserPassword": "password",
+    "adminUserId": "00000000-0000-0000-0000-000000000002",
+    "adminUserPassword": "password"
   },
   "apiKeys": [
     {
@@ -68,6 +70,25 @@
           "defaultConsentMessage": "Allow this application to read your name",
           "defaultConsentDetail": "This will share your display name with the requesting application.",
           "required": true
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user/registration/#{adminUserId}",
+      "body": {
+        "user": {
+          "email": "admin@example.com",
+          "firstName": "Admin",
+          "lastName": "User",
+          "password": "#{adminUserPassword}",
+          "username": "admin"
+        },
+        "registration": {
+          "applicationId": "#{FUSIONAUTH_APPLICATION_ID}",
+          "roles": [
+            "admin"
+          ]
         }
       }
     }
