@@ -102,7 +102,7 @@ def create_scope(base_url: str, api_key: str, app_id: str) -> bool:
 
 def create_client_application(
     base_url: str, api_key: str, client_key: str, config: dict
-) -> dict | None:
+) -> "dict | None":
     """Create an OAuth application in FusionAuth for an MCP client."""
     app_id = str(uuid.uuid4())
 

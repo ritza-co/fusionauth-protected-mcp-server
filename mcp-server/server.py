@@ -16,7 +16,6 @@ FUSIONAUTH_EXTERNAL_URL = os.environ.get("FUSIONAUTH_EXTERNAL_URL", "http://loca
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000")
 MCP_APP_ID = os.environ.get("MCP_APP_ID", "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e")
 MCP_APP_SECRET = os.environ.get("MCP_APP_SECRET", "P6mR6aMjI-c7WJPe1RA95_S6HIpq9xzEqFGhaY5yqDc")
-FUSIONAUTH_API_KEY = os.environ.get("FUSIONAUTH_API_KEY", "bf69486b-4733-4470-a592-f1bfce7af580")
 
 
 class FusionAuthTokenVerifier(TokenVerifier):
@@ -36,7 +35,9 @@ class FusionAuthTokenVerifier(TokenVerifier):
 
     async def verify_token(self, token: str) -> AccessToken | None:
         try:
-            # Validate token via UserInfo endpoint
+            # Validate token via UserInfo endpoint. With the profile, email, and
+            # openid scopes requested, the response includes user profile data
+            # (name, email) so no separate API call is needed.
             resp = requests.get(
                 f"{self.fusionauth_url}/oauth2/userinfo",
                 headers={"Authorization": f"Bearer {token}"},
@@ -48,13 +49,19 @@ class FusionAuthTokenVerifier(TokenVerifier):
 
             userinfo = resp.json()
 
-            # Decode token claims
+            # The UserInfo endpoint does not return scopes, so we decode the JWT
+            # to extract them. FastMCP uses scopes to enforce access control on
+            # individual tools.
             import base64
             payload_b64 = token.split('.')[1]
             payload_b64 += '=' * (4 - len(payload_b64) % 4)  # Add padding
             claims = json.loads(base64.urlsafe_b64decode(payload_b64))
 
             scopes = claims.get("scope", "").split() if claims.get("scope") else []
+
+            # Merge userinfo into claims so tools can access profile data
+            # (e.g. name, email) without needing a separate API call.
+            claims.update(userinfo)
 
             return AccessToken(
                 token=token,
@@ -72,7 +79,7 @@ token_verifier = FusionAuthTokenVerifier(
     fusionauth_url=FUSIONAUTH_URL,
     client_id=MCP_APP_ID,
     client_secret=MCP_APP_SECRET,
-    required_scopes=["get_name"],
+    required_scopes=["openid", "profile", "email", "get_name"],
 )
 
 auth = RemoteAuthProvider(
@@ -87,25 +94,6 @@ mcp = FastMCP(
 )
 
 
-def _lookup_user_name(user_id: str) -> str:
-    """Look up a user's name from FusionAuth by user ID."""
-    try:
-        resp = requests.get(
-            f"{FUSIONAUTH_URL}/api/user/{user_id}",
-            headers={"Authorization": FUSIONAUTH_API_KEY},
-        )
-        if resp.status_code == 200:
-            user = resp.json().get("user", {})
-            first = user.get("firstName", "")
-            last = user.get("lastName", "")
-            if first or last:
-                return f"{first} {last}".strip()
-            return user.get("username") or user.get("email") or user_id
-    except Exception as e:
-        logger.error("Failed to look up user: %s", e)
-    return user_id
-
-
 @mcp.tool()
 def get_name() -> str:
     """Get the authenticated user's name from the access token.
@@ -117,8 +105,10 @@ def get_name() -> str:
     if access_token is None:
         return "Error: No access token found. Please authenticate first."
 
-    user_id = access_token.client_id
-    name = _lookup_user_name(user_id)
+    claims = access_token.claims
+    given = claims.get("given_name", "")
+    family = claims.get("family_name", "")
+    name = f"{given} {family}".strip() or claims.get("preferred_username") or claims.get("email") or access_token.client_id
 
     return f"Hello, {name}!"
 
