@@ -124,17 +124,16 @@ def create_client_application(
 
 def print_mcp_config(client_name: str, client_id: str, mcp_server_url: str):
     """Print the MCP client configuration for the user to add."""
+    args = ["mcp-remote", f"{mcp_server_url}/mcp"]
+    if mcp_server_url.startswith("http://"):
+        args.append("--allow-http")
+    args += ["--static-oauth-client-info", f'{{"client_id":"{client_id}"}}']
+
     config = {
         "mcpServers": {
             "fusionauth-mcp": {
                 "command": "npx",
-                "args": [
-                    "mcp-remote",
-                    f"{mcp_server_url}/mcp",
-                    "--allow-http",
-                    "--static-oauth-client-info",
-                    f'{{"client_id":"{client_id}"}}'
-                ]
+                "args": args,
             }
         }
     }
