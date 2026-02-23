@@ -54,9 +54,9 @@ services:
     environment:
       FUSIONAUTH_URL: http://fusionauth:9011
       FUSIONAUTH_EXTERNAL_URL: http://localhost:9011
-      MCP_SERVER_URL: http://localhost:8000
+      MCP_SERVER_URL: ${MCP_SERVER_URL:-http://localhost:8000}
       MCP_APP_ID: e9fdb985-9173-4e01-9d73-ac2d60d1dc8e
-      FUSIONAUTH_API_KEY: bf69486b-4733-4470-a592-f1bfce7af580
+      MCP_APP_SECRET: P6mR6aMjI-c7WJPe1RA95_S6HIpq9xzEqFGhaY5yqDc
     ports:
       - "8000:8000"
     networks:

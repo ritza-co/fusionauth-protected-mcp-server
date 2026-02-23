@@ -20,11 +20,19 @@ import requests
 FUSIONAUTH_URL = "http://localhost:9011"
 API_KEY = "bf69486b-4733-4470-a592-f1bfce7af580"
 MCP_SERVER_APP_ID = "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e"
+TENANT_ID = None
 
 REDIRECT_URLS = [
     "http://localhost:*/oauth/callback",
     "http://127.0.0.1:*/oauth/callback",
 ]
+
+
+def build_headers(api_key: str, tenant_id: str = None) -> dict:
+    headers = {"Authorization": api_key, "Content-Type": "application/json"}
+    if tenant_id:
+        headers["X-FusionAuth-TenantId"] = tenant_id
+    return headers
 
 
 def check_fusionauth(base_url: str, api_key: str) -> bool:
@@ -39,14 +47,11 @@ def check_fusionauth(base_url: str, api_key: str) -> bool:
         return False
 
 
-def create_scope(base_url: str, api_key: str, app_id: str) -> bool:
+def create_scope(base_url: str, api_key: str, app_id: str, tenant_id: str = None) -> bool:
     """Try to create the get_name custom scope on the MCP Server application."""
     resp = requests.post(
         f"{base_url}/api/application/{app_id}/scope",
-        headers={
-            "Authorization": api_key,
-            "Content-Type": "application/json",
-        },
+        headers=build_headers(api_key, tenant_id),
         json={
             "scope": {
                 "name": "get_name",
@@ -80,7 +85,7 @@ def create_scope(base_url: str, api_key: str, app_id: str) -> bool:
 
 
 def create_client_application(
-    base_url: str, api_key: str, client_name: str
+    base_url: str, api_key: str, client_name: str, tenant_id: str = None
 ) -> "dict | None":
     """Create an OAuth application in FusionAuth for an MCP client."""
     app_id = str(uuid.uuid4())
@@ -104,10 +109,7 @@ def create_client_application(
 
     resp = requests.post(
         f"{base_url}/api/application/{app_id}",
-        headers={
-            "Authorization": api_key,
-            "Content-Type": "application/json",
-        },
+        headers=build_headers(api_key, tenant_id),
         json=body,
     )
 
@@ -124,17 +126,16 @@ def create_client_application(
 
 def print_mcp_config(client_name: str, client_id: str, mcp_server_url: str):
     """Print the MCP client configuration for the user to add."""
+    args = ["mcp-remote", f"{mcp_server_url}/mcp"]
+    if mcp_server_url.startswith("http://"):
+        args.append("--allow-http")
+    args += ["--static-oauth-client-info", f'{{"client_id":"{client_id}"}}']
+
     config = {
         "mcpServers": {
             "fusionauth-mcp": {
                 "command": "npx",
-                "args": [
-                    "mcp-remote",
-                    f"{mcp_server_url}/mcp",
-                    "--allow-http",
-                    "--static-oauth-client-info",
-                    f'{{"client_id":"{client_id}"}}'
-                ]
+                "args": args,
             }
         }
     }
@@ -162,6 +163,16 @@ def main():
         default="http://localhost:8000",
         help="MCP server URL (default: http://localhost:8000)",
     )
+    parser.add_argument(
+        "--tenant-id",
+        default=TENANT_ID,
+        help="FusionAuth tenant Id (required for multi-tenant instances)",
+    )
+    parser.add_argument(
+        "--mcp-app-id",
+        default=MCP_SERVER_APP_ID,
+        help=f"MCP Server application Id in FusionAuth (default: {MCP_SERVER_APP_ID})",
+    )
     args = parser.parse_args()
 
     print("FusionAuth MCP Client Setup")
@@ -177,7 +188,7 @@ def main():
 
     # Try to create the custom scope on the MCP Server application
     print("\nConfiguring MCP Server application scope...")
-    create_scope(args.fusionauth_url, args.api_key, MCP_SERVER_APP_ID)
+    create_scope(args.fusionauth_url, args.api_key, args.mcp_app_id, args.tenant_id)
 
     client_name = input("\nEnter a name for this MCP client (e.g. Claude Desktop): ").strip()
     if not client_name:
@@ -185,7 +196,7 @@ def main():
         sys.exit(0)
 
     print(f"\n  Creating {client_name}...")
-    result = create_client_application(args.fusionauth_url, args.api_key, client_name)
+    result = create_client_application(args.fusionauth_url, args.api_key, client_name, args.tenant_id)
 
     if result:
         print(f"  Created {result['name']} (Client Id: {result['client_id']})")
