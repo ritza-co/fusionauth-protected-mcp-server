@@ -2,13 +2,12 @@
 """
 MCP Client Setup Script
 
-Registers MCP clients (Claude Desktop, Cursor, etc.) as OAuth applications
-in FusionAuth so they can authenticate against the MCP server.
+Registers an MCP client as an OAuth application in FusionAuth so it can
+authenticate against the MCP server. Run this script once for each MCP
+client you want to register.
 
 Usage:
     python setup_clients.py [--fusionauth-url URL] [--api-key KEY]
-
-The script will prompt you to select which clients to register.
 """
 
 import argparse
@@ -22,24 +21,10 @@ FUSIONAUTH_URL = "http://localhost:9011"
 API_KEY = "bf69486b-4733-4470-a592-f1bfce7af580"
 MCP_SERVER_APP_ID = "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e"
 
-CLIENT_CONFIGS = {
-    "claude_desktop": {
-        "name": "Claude Desktop",
-        "description": "Claude Desktop MCP client",
-        "redirect_urls": [
-            "http://localhost:*/oauth/callback",
-            "http://127.0.0.1:*/oauth/callback",
-        ],
-    },
-    "cursor": {
-        "name": "Cursor",
-        "description": "Cursor IDE MCP client",
-        "redirect_urls": [
-            "http://localhost:*/oauth/callback",
-            "http://127.0.0.1:*/oauth/callback",
-        ],
-    },
-}
+REDIRECT_URLS = [
+    "http://localhost:*/oauth/callback",
+    "http://127.0.0.1:*/oauth/callback",
+]
 
 
 def check_fusionauth(base_url: str, api_key: str) -> bool:
@@ -84,7 +69,7 @@ def create_scope(base_url: str, api_key: str, app_id: str) -> bool:
             return True
         for err in general_errors:
             if "license" in err.get("message", "").lower():
-                print("  Note: Custom scopes require a FusionAuth Enterprise license.")
+                print("  Note: Custom scopes require a FusionAuth Essentials license.")
                 print("  The MCP server will still work, but without the custom 'get_name' scope.")
                 return False
         print(f"  Failed to create scope: {resp.status_code}")
@@ -95,22 +80,22 @@ def create_scope(base_url: str, api_key: str, app_id: str) -> bool:
 
 
 def create_client_application(
-    base_url: str, api_key: str, client_key: str, config: dict
+    base_url: str, api_key: str, client_name: str
 ) -> "dict | None":
     """Create an OAuth application in FusionAuth for an MCP client."""
     app_id = str(uuid.uuid4())
 
     body = {
         "application": {
-            "name": config["name"],
+            "name": client_name,
             "oauthConfiguration": {
-                "authorizedRedirectURLs": config["redirect_urls"],
+                "authorizedRedirectURLs": REDIRECT_URLS,
+                "authorizedURLValidationPolicy": "AllowWildcards",
                 "clientAuthenticationPolicy": "NotRequiredWhenUsingPKCE",
                 "enabledGrants": ["authorization_code", "refresh_token"],
                 "generateRefreshTokens": True,
                 "proofKeyForCodeExchangePolicy": "Required",
                 "requireClientAuthentication": False,
-                "authorizedURLValidationPolicy": "AllowWildcards",
                 "scopeHandlingPolicy": "Compatibility",
                 "unknownScopePolicy": "Allow",
             },
@@ -129,14 +114,11 @@ def create_client_application(
     if resp.status_code in (200, 201):
         app_data = resp.json()["application"]
         return {
-            "name": config["name"],
+            "name": client_name,
             "client_id": app_data["id"],
-            "client_secret": app_data.get("oauthConfiguration", {}).get(
-                "clientSecret", ""
-            ),
         }
     else:
-        print(f"  Failed to create {config['name']}: {resp.status_code}")
+        print(f"  Failed to create {client_name}: {resp.status_code}")
         return None
 
 
@@ -158,13 +140,13 @@ def print_mcp_config(client_name: str, client_id: str, mcp_server_url: str):
     }
 
     print(f"\n  MCP configuration for {client_name}:")
-    print(f"  Client ID: {client_id}")
+    print(f"  Client Id: {client_id}")
     print(f"\n  Add this to your MCP client config:")
     print(f"  {json.dumps(config, indent=2)}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Set up MCP clients in FusionAuth")
+    parser = argparse.ArgumentParser(description="Set up an MCP client in FusionAuth")
     parser.add_argument(
         "--fusionauth-url",
         default=FUSIONAUTH_URL,
@@ -197,61 +179,26 @@ def main():
     print("\nConfiguring MCP Server application scope...")
     create_scope(args.fusionauth_url, args.api_key, MCP_SERVER_APP_ID)
 
-    print("\nAvailable MCP clients:")
-    for i, (key, config) in enumerate(CLIENT_CONFIGS.items(), 1):
-        print(f"  {i}. {config['name']}")
-    print(f"  {len(CLIENT_CONFIGS) + 1}. All")
-
-    choice = input("\nSelect clients to register (comma-separated numbers): ").strip()
-    if not choice:
-        print("No selection made. Exiting.")
+    client_name = input("\nEnter a name for this MCP client (e.g. Claude Desktop): ").strip()
+    if not client_name:
+        print("No name provided. Exiting.")
         sys.exit(0)
 
-    selected = []
-    keys = list(CLIENT_CONFIGS.keys())
-    for num in choice.split(","):
-        num = num.strip()
-        if num == str(len(CLIENT_CONFIGS) + 1):
-            selected = keys[:]
-            break
-        try:
-            idx = int(num) - 1
-            if 0 <= idx < len(keys):
-                selected.append(keys[idx])
-        except ValueError:
-            pass
+    print(f"\n  Creating {client_name}...")
+    result = create_client_application(args.fusionauth_url, args.api_key, client_name)
 
-    if not selected:
-        print("Invalid selection. Exiting.")
-        sys.exit(1)
-
-    print(f"\nRegistering {len(selected)} client(s)...")
-    results = []
-    for key in selected:
-        config = CLIENT_CONFIGS[key]
-        print(f"\n  Creating {config['name']}...")
-        result = create_client_application(
-            args.fusionauth_url, args.api_key, key, config
-        )
-        if result:
-            results.append(result)
-            print(f"  Created {result['name']} (Client ID: {result['client_id']})")
-
-    if results:
+    if result:
+        print(f"  Created {result['name']} (Client Id: {result['client_id']})")
         print("\n" + "=" * 40)
         print("Setup complete!")
         print("=" * 40)
-        for result in results:
-            print_mcp_config(
-                result["name"], result["client_id"], args.mcp_server_url
-            )
+        print_mcp_config(result["name"], result["client_id"], args.mcp_server_url)
 
         print("\n\nTest user credentials:")
         print("  Email: test@example.com")
         print("  Password: password")
-
     else:
-        print("\nNo clients were created.")
+        print("\nClient was not created.")
 
 
 if __name__ == "__main__":
