@@ -27,6 +27,8 @@ REDIRECT_URLS = [
     "http://127.0.0.1:*/oauth/callback",
 ]
 
+CONNECTOR_UI_REDIRECT_URL = "https://claude.ai/api/mcp/auth_callback"
+
 
 def build_headers(api_key: str, tenant_id: str = None) -> dict:
     headers = {"Authorization": api_key, "Content-Type": "application/json"}
@@ -85,22 +87,33 @@ def create_scope(base_url: str, api_key: str, app_id: str, tenant_id: str = None
 
 
 def create_client_application(
-    base_url: str, api_key: str, client_name: str, tenant_id: str = None
+    base_url: str, api_key: str, client_name: str, tenant_id: str = None, connector_ui: bool = False
 ) -> "dict | None":
     """Create an OAuth application in FusionAuth for an MCP client."""
     app_id = str(uuid.uuid4())
+
+    if connector_ui:
+        redirect_urls = [CONNECTOR_UI_REDIRECT_URL]
+        pkce_policy = "NotRequired"
+        client_auth_policy = "Required"
+        require_client_auth = True
+    else:
+        redirect_urls = REDIRECT_URLS
+        pkce_policy = "Required"
+        client_auth_policy = "NotRequiredWhenUsingPKCE"
+        require_client_auth = False
 
     body = {
         "application": {
             "name": client_name,
             "oauthConfiguration": {
-                "authorizedRedirectURLs": REDIRECT_URLS,
+                "authorizedRedirectURLs": redirect_urls,
                 "authorizedURLValidationPolicy": "AllowWildcards",
-                "clientAuthenticationPolicy": "NotRequiredWhenUsingPKCE",
+                "clientAuthenticationPolicy": client_auth_policy,
                 "enabledGrants": ["authorization_code", "refresh_token"],
                 "generateRefreshTokens": True,
-                "proofKeyForCodeExchangePolicy": "Required",
-                "requireClientAuthentication": False,
+                "proofKeyForCodeExchangePolicy": pkce_policy,
+                "requireClientAuthentication": require_client_auth,
                 "scopeHandlingPolicy": "Compatibility",
                 "unknownScopePolicy": "Allow",
             },
@@ -115,17 +128,28 @@ def create_client_application(
 
     if resp.status_code in (200, 201):
         app_data = resp.json()["application"]
-        return {
+        result = {
             "name": client_name,
             "client_id": app_data["id"],
         }
+        if connector_ui:
+            result["client_secret"] = app_data["oauthConfiguration"]["clientSecret"]
+        return result
     else:
         print(f"  Failed to create {client_name}: {resp.status_code}")
         return None
 
 
-def print_mcp_config(client_name: str, client_id: str, mcp_server_url: str):
+def print_mcp_config(client_name: str, client_id: str, mcp_server_url: str, client_secret: str = None):
     """Print the MCP client configuration for the user to add."""
+    if client_secret:
+        print(f"\n  Connector UI configuration for {client_name}:")
+        print(f"  URL:           {mcp_server_url}/mcp")
+        print(f"  Client Id:     {client_id}")
+        print(f"  Client Secret: {client_secret}")
+        print(f"\n  Enter these values in Settings -> Connectors in Claude Desktop or claude.ai.")
+        return
+
     args = ["mcp-remote", f"{mcp_server_url}/mcp"]
     if mcp_server_url.startswith("http://"):
         args.append("--allow-http")
@@ -173,6 +197,11 @@ def main():
         default=MCP_SERVER_APP_ID,
         help=f"MCP Server application Id in FusionAuth (default: {MCP_SERVER_APP_ID})",
     )
+    parser.add_argument(
+        "--connector-ui",
+        action="store_true",
+        help="Register for the Claude Desktop or claude.ai connector UI (uses https://claude.ai/api/mcp/auth_callback as redirect URL and outputs client secret)",
+    )
     args = parser.parse_args()
 
     print("FusionAuth MCP Client Setup")
@@ -196,14 +225,14 @@ def main():
         sys.exit(0)
 
     print(f"\n  Creating {client_name}...")
-    result = create_client_application(args.fusionauth_url, args.api_key, client_name, args.tenant_id)
+    result = create_client_application(args.fusionauth_url, args.api_key, client_name, args.tenant_id, args.connector_ui)
 
     if result:
         print(f"  Created {result['name']} (Client Id: {result['client_id']})")
         print("\n" + "=" * 40)
         print("Setup complete!")
         print("=" * 40)
-        print_mcp_config(result["name"], result["client_id"], args.mcp_server_url)
+        print_mcp_config(result["name"], result["client_id"], args.mcp_server_url, result.get("client_secret"))
 
         print("\n\nTest user credentials:")
         print("  Email: test@example.com")
