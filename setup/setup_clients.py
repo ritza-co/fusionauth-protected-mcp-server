@@ -24,6 +24,8 @@ MCP_SERVER_APP_ID = "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e"
 REDIRECT_URLS = [
     "http://localhost:*/oauth/callback",
     "http://127.0.0.1:*/oauth/callback",
+    "http://localhost:*/callback",
+    "http://127.0.0.1:*/callback",
 ]
 
 CONNECTOR_UI_REDIRECT_URL = "https://claude.ai/api/mcp/auth_callback"
