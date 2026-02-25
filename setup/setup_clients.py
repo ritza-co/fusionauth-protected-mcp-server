@@ -25,6 +25,8 @@ TENANT_ID = None
 REDIRECT_URLS = [
     "http://localhost:*/oauth/callback",
     "http://127.0.0.1:*/oauth/callback",
+    "http://localhost:*/callback",
+    "http://127.0.0.1:*/callback",
 ]
 
 CONNECTOR_UI_REDIRECT_URL = "https://claude.ai/api/mcp/auth_callback"
