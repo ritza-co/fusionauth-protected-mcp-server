@@ -1,8 +1,7 @@
 import os
 import logging
-import json
 
-import requests
+from fusionauth.fusionauth_client import FusionAuthClient
 from fastmcp import FastMCP
 from fastmcp.server.auth import RemoteAuthProvider, AccessToken, TokenVerifier
 from fastmcp.server.dependencies import get_access_token
@@ -14,54 +13,29 @@ logger = logging.getLogger(__name__)
 FUSIONAUTH_URL = os.environ.get("FUSIONAUTH_URL", "http://fusionauth:9011")
 FUSIONAUTH_EXTERNAL_URL = os.environ.get("FUSIONAUTH_EXTERNAL_URL", "http://localhost:9011")
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000")
-MCP_APP_ID = os.environ.get("MCP_APP_ID", "e9fdb985-9173-4e01-9d73-ac2d60d1dc8e")
-MCP_APP_SECRET = os.environ.get("MCP_APP_SECRET", "P6mR6aMjI-c7WJPe1RA95_S6HIpq9xzEqFGhaY5yqDc")
 
 
 class FusionAuthTokenVerifier(TokenVerifier):
-    """Verifies tokens by calling FusionAuth's UserInfo endpoint."""
+    """Verifies tokens using the FusionAuth JWT validation endpoint."""
 
     def __init__(
         self,
         fusionauth_url: str,
-        client_id: str,
-        client_secret: str | None = None,
         required_scopes: list[str] | None = None,
     ):
         super().__init__(required_scopes=required_scopes)
-        self.fusionauth_url = fusionauth_url
-        self.client_id = client_id
-        self.client_secret = client_secret
+        self.client = FusionAuthClient(None, fusionauth_url)
 
     async def verify_token(self, token: str) -> AccessToken | None:
         try:
-            # Validate token via UserInfo endpoint. With the profile, email, and
-            # openid scopes requested, the response includes user profile data
-            # (name, email) so no separate API call is needed.
-            resp = requests.get(
-                f"{self.fusionauth_url}/oauth2/userinfo",
-                headers={"Authorization": f"Bearer {token}"},
-            )
+            response = self.client.validate_jwt(token)
 
-            if resp.status_code != 200:
-                logger.warning("Token validation failed")
+            if not response.was_successful():
+                logger.warning("Token validation failed: %s", response.error_response)
                 return None
 
-            userinfo = resp.json()
-
-            # The UserInfo endpoint does not return scopes, so we decode the JWT
-            # to extract them. FastMCP uses scopes to enforce access control on
-            # individual tools.
-            import base64
-            payload_b64 = token.split('.')[1]
-            payload_b64 += '=' * (4 - len(payload_b64) % 4)  # Add padding
-            claims = json.loads(base64.urlsafe_b64decode(payload_b64))
-
+            claims = response.success_response.get("jwt", {})
             scopes = claims.get("scope", "").split() if claims.get("scope") else []
-
-            # Merge userinfo into claims so tools can access profile data
-            # (e.g. name, email) without needing a separate API call.
-            claims.update(userinfo)
 
             return AccessToken(
                 token=token,
@@ -77,9 +51,7 @@ class FusionAuthTokenVerifier(TokenVerifier):
 
 token_verifier = FusionAuthTokenVerifier(
     fusionauth_url=FUSIONAUTH_URL,
-    client_id=MCP_APP_ID,
-    client_secret=MCP_APP_SECRET,
-    required_scopes=["openid", "profile", "email", "get_name"],
+    required_scopes=["get_name"],
 )
 
 auth = RemoteAuthProvider(
@@ -96,7 +68,7 @@ mcp = FastMCP(
 
 @mcp.tool()
 def get_name() -> str:
-    """Get the authenticated user's name from the access token.
+    """Get the authenticated user's name from FusionAuth.
 
     Returns the name of the currently authenticated user. Requires a valid
     FusionAuth access token with the 'get_name' scope.
@@ -105,10 +77,18 @@ def get_name() -> str:
     if access_token is None:
         return "Error: No access token found. Please authenticate first."
 
-    claims = access_token.claims
-    given = claims.get("given_name", "")
-    family = claims.get("family_name", "")
-    name = f"{given} {family}".strip() or claims.get("preferred_username") or claims.get("email") or access_token.client_id
+    client = FusionAuthClient(None, FUSIONAUTH_URL)
+    response = client.retrieve_user_info_from_access_token(access_token.token)
+
+    if not response.was_successful():
+        logger.warning("UserInfo request failed: %s", response.error_response)
+        claims = access_token.claims
+        return f"Hello, {claims.get('preferred_username') or claims.get('email') or access_token.client_id}!"
+
+    userinfo = response.success_response
+    given = userinfo.get("given_name", "")
+    family = userinfo.get("family_name", "")
+    name = f"{given} {family}".strip() or userinfo.get("preferred_username") or userinfo.get("email") or access_token.client_id
 
     return f"Hello, {name}!"
 
