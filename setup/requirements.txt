@@ -1,1 +1,1 @@
-requests
+fusionauth-client
