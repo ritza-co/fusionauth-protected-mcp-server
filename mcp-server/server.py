@@ -58,6 +58,7 @@ auth = RemoteAuthProvider(
     token_verifier=token_verifier,
     authorization_servers=[AnyHttpUrl(FUSIONAUTH_EXTERNAL_URL)],
     base_url=MCP_SERVER_URL,
+    scopes_supported=["openid", "profile", "get_name"],
 )
 
 mcp = FastMCP(
