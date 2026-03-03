@@ -1,3 +1,4 @@
+# tag::imports
 import os
 import logging
 
@@ -13,8 +14,10 @@ logger = logging.getLogger(__name__)
 FUSIONAUTH_URL = os.environ.get("FUSIONAUTH_URL", "http://fusionauth:9011")
 FUSIONAUTH_EXTERNAL_URL = os.environ.get("FUSIONAUTH_EXTERNAL_URL", "http://localhost:9011")
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000")
+# end::imports
 
 
+# tag::token-verifier
 class FusionAuthTokenVerifier(TokenVerifier):
     """Verifies tokens using the FusionAuth JWT validation endpoint."""
 
@@ -47,8 +50,10 @@ class FusionAuthTokenVerifier(TokenVerifier):
         except Exception as e:
             logger.error("Failed to validate token: %s", e)
             return None
+# end::token-verifier
 
 
+# tag::mcp-init
 token_verifier = FusionAuthTokenVerifier(
     fusionauth_url=FUSIONAUTH_URL,
     required_scopes=["get_name"],
@@ -65,8 +70,10 @@ mcp = FastMCP(
     name="FusionAuth MCP Server",
     auth=auth,
 )
+# end::mcp-init
 
 
+# tag::get-name-tool
 @mcp.tool()
 def get_name() -> str:
     """Get the authenticated user's name from FusionAuth.
@@ -92,6 +99,7 @@ def get_name() -> str:
     name = f"{given} {family}".strip() or userinfo.get("preferred_username") or userinfo.get("email") or access_token.client_id
 
     return f"Hello, {name}!"
+# end::get-name-tool
 
 
 if __name__ == "__main__":
