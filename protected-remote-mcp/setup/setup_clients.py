@@ -18,7 +18,7 @@ import uuid
 from fusionauth.fusionauth_client import FusionAuthClient
 
 FUSIONAUTH_URL = "http://localhost:9011"
-API_KEY = "bf69486b-4733-4470-a592-f1bfce7af580"
+API_KEY = None
 DEFAULT_PORT = 3334
 TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -156,7 +156,7 @@ def main():
     )
     parser.add_argument(
         "--api-key",
-        default=API_KEY,
+        required=True,
         help="FusionAuth API key",
     )
     parser.add_argument(
