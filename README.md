@@ -10,4 +10,4 @@ This repository contains three self-contained examples:
 | `protected-local-mcp/` | Completed code — the same MCP server with FusionAuth OAuth protection added. |
 | `protected-remote-mcp/` | Remote deployment variant — extends the protected server with flags for deploying to a public URL. |
 
-Each folder contains its own `docker-compose.yml`, `kickstart/`, `mcp-server/`, and `setup/` directories and can be run independently.
+The `unprotected-local-mcp` and `protected-local-mcp` folders each contain a full Docker stack (FusionAuth, PostgreSQL, MCP server) and can be run independently. The `protected-remote-mcp` folder contains only the MCP server and is intended for use with an existing FusionAuth instance.

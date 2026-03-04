@@ -46,4 +46,4 @@ Restart your MCP client. Your browser will open to FusionAuth's login page. Use 
 - Email: `test@example.com`
 - Password: `password`
 
-After granting consent, ask your client: "What's my name?"
+After logging in, ask your client: "What's my name?"
