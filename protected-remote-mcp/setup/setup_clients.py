@@ -171,6 +171,11 @@ def main():
         help=f"OAuth callback port for mcp-remote (default: {DEFAULT_PORT}). Change this if port {DEFAULT_PORT} is already in use on your machine.",
     )
     parser.add_argument(
+        "--tenant-id",
+        default=None,
+        help="FusionAuth tenant Id (required for multi-tenant instances)",
+    )
+    parser.add_argument(
         "--connector-ui",
         action="store_true",
         help="Register for the Claude Desktop or claude.ai connector UI (uses https://claude.ai/api/mcp/auth_callback as redirect URL and outputs client secret)",
@@ -178,6 +183,8 @@ def main():
     args = parser.parse_args()
 
     client = FusionAuthClient(args.api_key, args.fusionauth_url)
+    if args.tenant_id:
+        client.tenant_id = args.tenant_id
 
     print("FusionAuth MCP Client Setup")
     print("=" * 40)
